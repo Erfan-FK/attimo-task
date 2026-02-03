@@ -11,9 +11,11 @@ import {
   Menu,
   X,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/auth-context';
 
 const navigation = [
   { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
@@ -25,6 +27,7 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = React.useState(false);
+  const { user, signOut } = useAuth();
 
   return (
     <>
@@ -80,16 +83,25 @@ export function Sidebar() {
             })}
           </nav>
 
-          <div className="border-t border-border p-4">
+          <div className="border-t border-border p-4 space-y-3">
             <div className="flex items-center gap-3 rounded-lg bg-surface2 px-3 py-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
-                U
+                {user?.email?.[0].toUpperCase() || 'U'}
               </div>
-              <div className="flex-1 text-sm">
-                <p className="font-medium">User</p>
-                <p className="text-xs text-muted">user@example.com</p>
+              <div className="flex-1 text-sm overflow-hidden">
+                <p className="font-medium truncate">{user?.email?.split('@')[0] || 'User'}</p>
+                <p className="text-xs text-muted truncate">{user?.email || 'user@example.com'}</p>
               </div>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start gap-2 text-muted hover:text-text"
+              onClick={signOut}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
           </div>
         </div>
       </aside>
