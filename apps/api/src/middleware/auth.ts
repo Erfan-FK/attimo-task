@@ -1,12 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAdmin } from '../lib/supabase';
+import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
+import { AppError } from './error';
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email?: string;
-  };
+  userId?: string;
+  userEmail?: string;
 }
+
+interface SupabaseJWTPayload extends JWTPayload {
+  sub: string;
+  email?: string;
+  role?: string;
+}
+
+const supabaseUrl = process.env.SUPABASE_URL;
+if (!supabaseUrl) {
+  throw new Error('SUPABASE_URL is required');
+}
+
+// Create JWKS endpoint URL
+const jwksUrl = new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
+
+// Create remote JWK Set for JWT verification
+const JWKS = createRemoteJWKSet(jwksUrl);
 
 export const authenticateUser = async (
   req: AuthRequest,
@@ -17,29 +33,31 @@ export const authenticateUser = async (
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Missing or invalid authorization header' });
-      return;
+      throw new AppError('Missing or invalid authorization header', 'UNAUTHORIZED', 401);
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Verify the JWT token with Supabase
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    // Verify JWT using JWKS
+    const { payload } = await jwtVerify<SupabaseJWTPayload>(token, JWKS, {
+      issuer: `${supabaseUrl}/auth/v1`,
+      audience: 'authenticated',
+    });
 
-    if (error || !user) {
-      res.status(401).json({ error: 'Invalid or expired token' });
-      return;
+    if (!payload.sub) {
+      throw new AppError('Invalid token payload', 'INVALID_TOKEN', 401);
     }
 
-    // Attach user to request
-    req.user = {
-      id: user.id,
-      email: user.email,
-    };
+    // Attach user info to request
+    req.userId = payload.sub;
+    req.userEmail = payload.email;
 
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(new AppError('Invalid or expired token', 'INVALID_TOKEN', 401));
+    }
   }
 };
