@@ -10,6 +10,7 @@ import {
   Settings,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -50,8 +51,11 @@ export function Sidebar() {
         )}
       >
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center border-b border-border px-6">
-            <h1 className="text-xl font-bold text-primary">Attimo</h1>
+          <div className="flex h-16 items-center gap-2 border-b border-border px-6">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-primary">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold">NoteAI</h1>
           </div>
 
           <nav className="flex-1 space-y-1 p-4">
