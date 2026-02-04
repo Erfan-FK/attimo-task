@@ -1,5 +1,8 @@
 import * as React from 'react';
+import { ReactNode } from 'react';
 import { Sidebar } from './sidebar';
+import { Button } from '@/components/ui/button';
+import { PageTransition } from '@/components/page-transition';
 import { Topbar } from './topbar';
 
 interface AppShellProps {

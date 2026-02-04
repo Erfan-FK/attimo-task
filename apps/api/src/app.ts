@@ -6,6 +6,7 @@ import { errorHandler, notFoundHandler } from './middleware/error';
 import tasksRouter from './routes/tasks';
 import notesRouter from './routes/notes';
 import aiRouter from './routes/ai';
+import profileRouter from './routes/profile';
 import { swaggerSpec } from './swagger';
 
 const app = express();
@@ -45,6 +46,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/tasks', tasksRouter);
 app.use('/api/notes', notesRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/profile', profileRouter);
 
 // 404 handler
 app.use(notFoundHandler);

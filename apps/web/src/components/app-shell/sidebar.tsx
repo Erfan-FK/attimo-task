@@ -80,7 +80,7 @@ export function Sidebar() {
           </nav>
 
           <div className="border-t border-border p-4 space-y-3">
-            <div className="flex items-center gap-3 rounded-lg bg-surface2 px-3 py-2">
+            <div className="flex items-center gap-3 rounded-lg bg-surface2 p-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
                 {user?.email?.[0].toUpperCase() || 'U'}
               </div>
@@ -88,16 +88,14 @@ export function Sidebar() {
                 <p className="font-medium truncate">{user?.email?.split('@')[0] || 'User'}</p>
                 <p className="text-xs text-muted truncate">{user?.email || 'user@example.com'}</p>
               </div>
+              <button
+                onClick={signOut}
+                className="ml-2 p-1.5 rounded-md hover:bg-surface transition-colors group"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4 text-muted group-hover:text-error transition-colors" />
+              </button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 text-muted hover:text-text"
-              onClick={signOut}
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
           </div>
         </div>
       </aside>
