@@ -108,7 +108,7 @@ export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelP
         toast.error('AI request timed out after 30 seconds. Please try again with shorter content.');
       }, 30000);
 
-      const response = await fetch(`http://localhost:4000/api/notes/${noteId}/ai`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/notes/${noteId}/ai`, {
         signal: controller.signal,
         method: 'POST',
         headers: {
@@ -199,7 +199,7 @@ export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelP
         return; // Silently fail for history loading
       }
 
-      const response = await fetch(`http://localhost:4000/api/notes/${noteId}/ai-history`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/notes/${noteId}/ai-history`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
