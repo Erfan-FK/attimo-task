@@ -8,6 +8,8 @@ import {
   noteIdSchema,
   noteQuerySchema,
 } from '../lib/validators';
+import { z } from 'zod';
+import { generateAIResponse, parseActionItems, AIAction } from '../lib/ai';
 
 const router = Router();
 
@@ -244,6 +246,119 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     res.json({
       success: true,
       message: 'Note deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route POST /api/notes/:id/ai
+ * @desc Generate AI content for a note
+ * @access Private
+ */
+router.post('/:id/ai', async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = noteIdSchema.parse(req.params);
+    const { action } = z.object({
+      action: z.enum(['summarize', 'improve', 'extract_tasks']),
+    }).parse(req.body);
+
+    // Fetch note and verify ownership
+    const { data: note, error: fetchError } = await supabaseAdmin
+      .from('notes')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.userId!)
+      .single();
+
+    if (fetchError || !note) {
+      throw new AppError('Note not found', 404);
+    }
+
+    // Check if note has content
+    if (!note.content || note.content.trim().length === 0) {
+      throw new AppError('Note content is empty. Please add content before using AI features.', 400);
+    }
+
+    // Generate AI response
+    const output = await generateAIResponse(action as AIAction, note.content);
+
+    // Parse action items if needed
+    let actionItems: string[] | undefined;
+    if (action === 'extract_tasks') {
+      try {
+        actionItems = parseActionItems(output);
+      } catch (parseError: any) {
+        // Return user-friendly error for task extraction failures
+        throw new AppError(parseError.message || 'Failed to extract tasks from note', 400);
+      }
+    }
+
+    // Save AI run to database
+    const { data: aiRun, error: insertError } = await supabaseAdmin
+      .from('note_ai_runs')
+      .insert({
+        user_id: req.userId!,
+        note_id: id,
+        action,
+        output,
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    res.json({
+      success: true,
+      data: {
+        output,
+        aiRunId: aiRun.id,
+        actionItems,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/notes/:id/ai-history
+ * @desc Get AI history for a note
+ * @access Private
+ */
+router.get('/:id/ai-history', async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = noteIdSchema.parse(req.params);
+
+    // Verify note ownership
+    const { data: note, error: fetchError } = await supabaseAdmin
+      .from('notes')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.userId!)
+      .single();
+
+    if (fetchError || !note) {
+      throw new AppError('Note not found', 404);
+    }
+
+    // Fetch last 5 AI runs
+    const { data: aiRuns, error } = await supabaseAdmin
+      .from('note_ai_runs')
+      .select('*')
+      .eq('note_id', id)
+      .eq('user_id', req.userId!)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: {
+        aiRuns: aiRuns || [],
+      },
     });
   } catch (error) {
     next(error);

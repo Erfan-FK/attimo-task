@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/custom-select';
 import { NoteList } from '@/components/notes/note-list';
 import { NoteEditor } from '@/components/notes/note-editor';
-import { notesApi, Note } from '@/lib/api';
+import { AIToolsPanel } from '@/components/notes/ai-tools-panel';
+import { notesApi, Note, tasksApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { FileText, Plus, Search, Pin, Tag, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -157,6 +158,24 @@ export default function NotesPage() {
     }
   };
 
+  const handleCreateTasksFromAI = async (actionItems: string[]) => {
+    try {
+      const promises = actionItems.map((title) =>
+        tasksApi.create({
+          title,
+          description: `Created from note: ${selectedNote?.title}`,
+          status: 'todo',
+          priority: 2,
+        })
+      );
+      
+      await Promise.all(promises);
+      toast.success(`Created ${actionItems.length} tasks! Navigate to Tasks page to view them.`);
+    } catch (error) {
+      throw new Error('Failed to create tasks');
+    }
+  };
+
   const showEmptyState = !isLoading && notes.length === 0 && !searchQuery && !filterTag && filterPinned === undefined;
 
   return (
@@ -266,22 +285,35 @@ export default function NotesPage() {
           </div>
         </div>
 
-        {/* Right Side - Note Editor (Always Visible) */}
-        <div className="flex-1 h-full overflow-y-auto custom-scrollbar">
-          {selectedNote ? (
-            <NoteEditor
-              note={selectedNote}
-              onSave={handleSaveNote}
-              onDelete={handleDeleteNote}
-              isLoading={isLoadingNote}
-              isSaving={isSaving}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <EmptyState
-                icon={<FileText className="h-8 w-8" />}
-                title="Select a note"
-                description="Choose a note from the list to view and edit, or create a new one."
+        {/* Right Side - Note Editor and AI Panel */}
+        <div className="flex-1 flex gap-6 overflow-hidden">
+          {/* Note Editor Section */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {selectedNote ? (
+              <NoteEditor
+                note={selectedNote}
+                onSave={handleSaveNote}
+                onDelete={handleDeleteNote}
+                isLoading={isLoadingNote}
+                isSaving={isSaving}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <EmptyState
+                  icon={<FileText className="h-6 w-6" />}
+                  title="No note selected"
+                  description="Select a note from the list to view and edit"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* AI Tools Panel - Fixed width, full height */}
+          {selectedNote && (
+            <div className="w-80 flex-shrink-0 overflow-y-auto custom-scrollbar">
+              <AIToolsPanel
+                noteId={selectedNote.id}
+                onCreateTasks={handleCreateTasksFromAI}
               />
             </div>
           )}
