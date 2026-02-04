@@ -313,6 +313,7 @@ export default function NotesPage() {
             <div className="w-80 flex-shrink-0 overflow-y-auto custom-scrollbar">
               <AIToolsPanel
                 noteId={selectedNote.id}
+                noteTitle={selectedNote.title}
                 onCreateTasks={handleCreateTasksFromAI}
               />
             </div>

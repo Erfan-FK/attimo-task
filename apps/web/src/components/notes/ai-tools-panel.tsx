@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -10,7 +10,7 @@ import {
   CustomSelectItem,
   CustomSelectValue,
 } from '@/components/ui/custom-select';
-import { Sparkles, Copy, Check, Loader2, ChevronDown, ChevronUp, Clock, ListTodo } from 'lucide-react';
+import { Sparkles, Copy, Check, Loader2, Clock, ListTodo } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase/client';
 
 interface AIToolsPanelProps {
   noteId: string;
+  noteTitle?: string;
   onCreateTasks?: (actionItems: string[]) => Promise<void>;
 }
 
@@ -34,16 +35,24 @@ const actionOptions = [
   { value: 'extract_tasks', label: '✅ Extract Tasks', description: 'Extract tasks from note' },
 ];
 
-export function AIToolsPanel({ noteId, onCreateTasks }: AIToolsPanelProps) {
+export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelProps) {
   const [selectedAction, setSelectedAction] = useState('summarize');
   const [isGenerating, setIsGenerating] = useState(false);
   const [output, setOutput] = useState('');
   const [actionItems, setActionItems] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [aiHistory, setAiHistory] = useState<AIRun[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
+
+  // Reset state when note changes and load history
+  useEffect(() => {
+    setOutput('');
+    setActionItems([]);
+    setAiHistory([]);
+    setSelectedAction('summarize');
+    loadHistory();
+  }, [noteId]);
 
   const handleGenerate = async () => {
     try {
@@ -111,11 +120,6 @@ export function AIToolsPanel({ noteId, onCreateTasks }: AIToolsPanelProps) {
   };
 
   const loadHistory = async () => {
-    if (aiHistory.length > 0) {
-      setIsHistoryOpen(!isHistoryOpen);
-      return;
-    }
-
     try {
       setIsLoadingHistory(true);
       
@@ -123,9 +127,7 @@ export function AIToolsPanel({ noteId, onCreateTasks }: AIToolsPanelProps) {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session?.access_token) {
-        toast.error('Session expired. Please log in again.');
-        window.location.href = '/auth/login';
-        return;
+        return; // Silently fail for history loading
       }
 
       const response = await fetch(`http://localhost:4000/api/notes/${noteId}/ai-history`, {
@@ -137,10 +139,9 @@ export function AIToolsPanel({ noteId, onCreateTasks }: AIToolsPanelProps) {
       const data = await response.json();
       if (response.ok) {
         setAiHistory(data.data.aiRuns);
-        setIsHistoryOpen(true);
       }
     } catch (error) {
-      toast.error('Failed to load AI history');
+      // Silently fail for history loading
     } finally {
       setIsLoadingHistory(false);
     }
@@ -164,26 +165,34 @@ export function AIToolsPanel({ noteId, onCreateTasks }: AIToolsPanelProps) {
 
   return (
     <Card className="border-accent/20 bg-gradient-to-br from-surface to-surface2 h-full flex flex-col">
-      <CardHeader className="pb-3 flex-shrink-0">
+      <CardHeader className="pb-3 flex-shrink-0 space-y-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Sparkles className="h-5 w-5 text-accent" />
           AI Tools
         </CardTitle>
+        {noteTitle && (
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <span className="truncate">For: <span className="font-medium text-text">{noteTitle}</span></span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4 flex-1 overflow-y-auto custom-scrollbar">
         {/* Action Selector */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Choose AI Action</label>
           <CustomSelect value={selectedAction} onValueChange={setSelectedAction}>
-            <CustomSelectTrigger>
-              <CustomSelectValue />
+            <CustomSelectTrigger className="h-auto min-h-[2.5rem]">
+              <div className="flex flex-col items-start py-1">
+                <span className="font-medium">{actionOptions.find(opt => opt.value === selectedAction)?.label}</span>
+                <span className="text-xs text-muted">{actionOptions.find(opt => opt.value === selectedAction)?.description}</span>
+              </div>
             </CustomSelectTrigger>
             <CustomSelectContent>
               {actionOptions.map((option) => (
-                <CustomSelectItem key={option.value} value={option.value}>
-                  <div className="flex flex-col">
-                    <span>{option.label}</span>
-                    <span className="text-xs text-muted">{option.description}</span>
+                <CustomSelectItem key={option.value} value={option.value} className="h-auto py-2">
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-xs text-muted leading-tight">{option.description}</span>
                   </div>
                 </CustomSelectItem>
               ))}
@@ -267,55 +276,83 @@ export function AIToolsPanel({ noteId, onCreateTasks }: AIToolsPanelProps) {
           </div>
         )}
 
-        {/* AI History */}
+        {/* AI History - Always Visible */}
         <div className="border-t border-border pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={loadHistory}
-            disabled={isLoadingHistory}
-            className="w-full justify-between"
-          >
-            <span className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              AI History
-            </span>
-            {isLoadingHistory ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isHistoryOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted" />
+              <span className="text-sm font-medium">AI History</span>
+            </div>
+            {isLoadingHistory && <Loader2 className="h-4 w-4 animate-spin text-muted" />}
+          </div>
 
-          {isHistoryOpen && (
-            <div className="mt-3 space-y-2">
+          <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
               {aiHistory.length === 0 ? (
-                <p className="text-sm text-muted text-center py-4">No AI history yet</p>
+                <p className="text-sm text-muted text-center py-4">No AI history for this note yet</p>
               ) : (
-                aiHistory.map((run) => (
-                  <button
-                    key={run.id}
-                    onClick={() => setOutput(run.output)}
-                    className={cn(
-                      'w-full text-left p-2 rounded-lg border border-border hover:bg-surface2 transition-colors',
-                      output === run.output && 'bg-surface2 border-accent'
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {actionOptions.find(opt => opt.value === run.action)?.label || run.action}
-                      </span>
-                      <span className="text-xs text-muted">
-                        {formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                  </button>
-                ))
+                <div className="space-y-2">
+                  <p className="text-xs text-muted px-1">Recent AI actions for this note:</p>
+                  {aiHistory.map((run) => (
+                    <button
+                      key={run.id}
+                      onClick={() => {
+                        setOutput(run.output);
+                        
+                        // If it's extract_tasks, try to parse and show action items
+                        if (run.action === 'extract_tasks') {
+                          try {
+                            // Try to parse as JSON array first
+                            const jsonMatch = run.output.match(/\[[\s\S]*\]/);
+                            if (jsonMatch) {
+                              const parsed = JSON.parse(jsonMatch[0]);
+                              if (Array.isArray(parsed)) {
+                                setActionItems(parsed.filter(item => typeof item === 'string' && item.trim().length > 0));
+                                return;
+                              }
+                            }
+                            
+                            // Fallback: split by newlines
+                            const lines = run.output.split('\n')
+                              .map(l => l.trim())
+                              .filter(l => l.length > 0 && !l.startsWith('[') && !l.startsWith(']'));
+                            if (lines.length > 0) {
+                              setActionItems(lines);
+                            }
+                          } catch (e) {
+                            // Ignore parsing errors for history
+                            setActionItems([]);
+                          }
+                        } else {
+                          // Clear action items for non-extract_tasks actions
+                          setActionItems([]);
+                        }
+                      }}
+                      className={cn(
+                        'w-full text-left p-3 rounded-lg border border-border hover:bg-surface2 transition-colors',
+                        output === run.output && 'bg-surface2 border-accent ring-1 ring-accent/20'
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium flex items-center gap-1.5">
+                            {run.action === 'summarize' && '📝'}
+                            {run.action === 'improve' && '✨'}
+                            {run.action === 'extract_tasks' && '✅'}
+                            {actionOptions.find(opt => opt.value === run.action)?.label.replace(/^[^\s]+\s/, '') || run.action}
+                          </span>
+                          <span className="text-xs text-muted whitespace-nowrap">
+                            {formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted line-clamp-2">
+                          {run.output.substring(0, 80)}...
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-          )}
         </div>
       </CardContent>
     </Card>
