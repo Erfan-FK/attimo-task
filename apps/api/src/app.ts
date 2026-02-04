@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { apiLimiter, aiLimiter, createLimiter } from './middleware/rate-limit';
 import tasksRouter from './routes/tasks';
 import notesRouter from './routes/notes';
 import aiRouter from './routes/ai';
@@ -42,10 +43,13 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-// API routes
+// Apply general rate limiting to all API routes
+app.use('/api', apiLimiter);
+
+// Routes with specific rate limiters
 app.use('/api/tasks', tasksRouter);
 app.use('/api/notes', notesRouter);
-app.use('/api/ai', aiRouter);
+app.use('/api/ai', aiLimiter, aiRouter); // Stricter limit for AI endpoints
 app.use('/api/profile', profileRouter);
 
 // 404 handler

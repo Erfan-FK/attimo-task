@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { AuthRequest, authenticateUser } from '../middleware/auth';
 import { AppError } from '../middleware/error';
+import { createLimiter } from '../middleware/rate-limit';
 import {
   createTaskSchema,
   updateTaskSchema,

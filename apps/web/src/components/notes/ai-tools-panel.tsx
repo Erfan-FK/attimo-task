@@ -60,6 +60,37 @@ export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelP
       setOutput('');
       setActionItems([]);
 
+      // Get the note content from Supabase
+      const { data: note, error: noteError } = await supabase
+        .from('notes')
+        .select('content')
+        .eq('id', noteId)
+        .single();
+
+      if (noteError || !note) {
+        toast.error('Failed to load note content. Please try again.');
+        return;
+      }
+
+      // Validate content is not empty
+      if (!note.content || note.content.trim().length === 0) {
+        toast.error('Note content is empty. Please add some content before using AI features.');
+        return;
+      }
+
+      // Validate content length (max 10,000 characters)
+      const MAX_CONTENT_LENGTH = 10000;
+      if (note.content.length > MAX_CONTENT_LENGTH) {
+        toast.error(`Note is too long (${note.content.length} characters). Maximum allowed is ${MAX_CONTENT_LENGTH} characters. Please shorten your note.`);
+        return;
+      }
+
+      // Validate minimum content length for meaningful AI processing
+      if (note.content.trim().length < 20) {
+        toast.error('Note content is too short. Please add at least 20 characters for AI to process.');
+        return;
+      }
+
       // Get token from Supabase session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -70,7 +101,15 @@ export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelP
         return;
       }
 
+      // Set up timeout for AI request (30 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        toast.error('AI request timed out after 30 seconds. Please try again with shorter content.');
+      }, 30000);
+
       const response = await fetch(`http://localhost:4000/api/notes/${noteId}/ai`, {
+        signal: controller.signal,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,20 +118,34 @@ export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelP
         body: JSON.stringify({ action: selectedAction }),
       });
 
+      // Clear timeout on successful response
+      clearTimeout(timeoutId);
+
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle 401 Unauthorized
+        // Handle specific error codes
         if (response.status === 401) {
-          toast.error('Session expired. Redirecting to login...');
+          toast.error('Your session has expired. Please log in again.', { duration: 5000 });
           setTimeout(() => {
-            window.location.href = '/auth/login';
-          }, 1500);
+            window.location.href = '/login';
+          }, 2000);
+          return;
+        }
+        
+        if (response.status === 429) {
+          toast.error('Too many AI requests. Please wait a few minutes before trying again.', { duration: 7000 });
+          return;
+        }
+
+        if (response.status === 400) {
+          const errorMessage = data.error || data.message || 'Invalid request. Please check your note content.';
+          toast.error(errorMessage, { duration: 6000 });
           return;
         }
         
         // Show user-friendly error message from backend
-        const errorMessage = data.error?.message || data.message || 'AI generation failed';
+        const errorMessage = data.error || data.message || 'AI generation failed. Please try again.';
         toast.error(errorMessage, { duration: 5000 });
         return;
       }
@@ -104,8 +157,24 @@ export function AIToolsPanel({ noteId, noteTitle, onCreateTasks }: AIToolsPanelP
 
       toast.success('AI content generated successfully!');
     } catch (error: any) {
-      // Show user-friendly error message
-      const errorMsg = error.message || 'Failed to generate AI content. Please try again.';
+      // Handle different error types
+      if (error.name === 'AbortError') {
+        // Timeout already handled above
+        return;
+      }
+      
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        toast.error('Network error. Please check your internet connection and try again.', { duration: 5000 });
+        return;
+      }
+
+      if (error.message?.includes('API key')) {
+        toast.error('AI service is not configured. Please contact support.', { duration: 5000 });
+        return;
+      }
+      
+      // Generic error with helpful message
+      const errorMsg = error.message || 'Failed to generate AI content. Please try again later.';
       toast.error(errorMsg, { duration: 5000 });
     } finally {
       setIsGenerating(false);

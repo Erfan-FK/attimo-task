@@ -12,22 +12,76 @@ interface AIPromptConfig {
 
 const AI_PROMPTS: Record<AIAction, AIPromptConfig> = {
   summarize: {
-    systemPrompt: 'You are a concise summarization assistant. Always return exactly 5 bullet points followed by one key takeaway line. Use plain text, no markdown headings or formatting.',
-    userPrompt: (content: string) => `Summarize the following note in exactly 5 bullet points, followed by one "Key Takeaway:" line:\n\n${content}`,
+    systemPrompt: `You are an expert summarization assistant. Your task is to create concise, actionable summaries.
+
+RULES:
+- Return exactly 5 bullet points (no more, no less)
+- Each bullet point should be 1-2 sentences maximum
+- Focus on key facts, decisions, and action items
+- End with exactly one "Key Takeaway:" sentence
+- Use plain text only (no markdown, no formatting)
+- Be objective and factual
+
+OUTPUT FORMAT:
+• [First main point]
+• [Second main point]
+• [Third main point]
+• [Fourth main point]
+• [Fifth main point]
+
+Key Takeaway: [One sentence summary]`,
+    userPrompt: (content: string) => `Summarize the following note according to the rules above:\n\n${content}`,
   },
   improve: {
-    systemPrompt: 'You are a professional writing assistant. Rewrite text to fix grammar and improve clarity while keeping the original meaning and length within ±20%. Use a neutral, professional tone.',
-    userPrompt: (content: string) => `Rewrite the following text to improve grammar and clarity. Keep the meaning the same and maintain similar length (±20%):\n\n${content}`,
+    systemPrompt: `You are a professional writing assistant specializing in clarity and conciseness.
+
+RULES:
+- Fix all grammar, spelling, and punctuation errors
+- Improve sentence structure and flow
+- Remove redundancy and filler words
+- Maintain the original meaning and tone
+- Keep length within ±20% of original
+- Use active voice where possible
+- Preserve technical terms and proper nouns
+- Return ONLY the improved text, no explanations`,
+    userPrompt: (content: string) => `Improve the following text according to the rules above:\n\n${content}`,
   },
   extract_tasks: {
-    systemPrompt: 'You are a task extraction assistant. Extract actionable tasks from text and return them as a JSON array of strings. Each task should be a short, clear action item (max 10 tasks). Return ONLY valid JSON array, nothing else.',
-    userPrompt: (content: string) => `Extract actionable tasks from the following note. Return a JSON array of strings, each being a short task title (max 10 tasks):\n\n${content}`,
+    systemPrompt: `You are a task extraction specialist. Extract clear, actionable tasks from any text.
+
+RULES:
+- Identify action items, to-dos, and commitments
+- Each task must start with an action verb (e.g., "Call", "Review", "Send")
+- Keep tasks concise (5-10 words maximum)
+- Extract maximum 10 most important tasks
+- Ignore vague or non-actionable items
+- Return ONLY a valid JSON array of strings
+- No explanations, no markdown, just JSON
+
+GOOD EXAMPLES:
+["Call John about project update", "Review Q4 budget proposal", "Send meeting notes to team"]
+
+BAD EXAMPLES:
+["Meeting", "Important stuff", "Things to remember"]`,
+    userPrompt: (content: string) => `Extract actionable tasks from the following note. Return a JSON array:\n\n${content}`,
   },
 };
 
 export async function generateAIResponse(action: AIAction, content: string): Promise<string> {
+  // Validate API key
   if (!groq) {
     throw new Error('Groq API key not configured. Please set GROQ_API_KEY in environment variables. Get your free key at https://console.groq.com/keys');
+  }
+
+  // Validate input content
+  if (!content || content.trim().length === 0) {
+    throw new Error('Content cannot be empty. Please provide text to process.');
+  }
+
+  // Enforce content length limits (Groq has token limits)
+  const MAX_CONTENT_LENGTH = 10000; // ~2500 tokens
+  if (content.length > MAX_CONTENT_LENGTH) {
+    throw new Error(`Content too long (${content.length} chars). Maximum allowed is ${MAX_CONTENT_LENGTH} characters.`);
   }
 
   const config = AI_PROMPTS[action];
