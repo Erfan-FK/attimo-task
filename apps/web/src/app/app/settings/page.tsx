@@ -38,7 +38,7 @@ export default function SettingsPage() {
         // Fetch profile from backend
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          const response = await fetch('http://localhost:4000/api/profile', {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/profile`, {
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
             },
@@ -67,7 +67,7 @@ export default function SettingsPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:4000/api/profile', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
