@@ -107,38 +107,84 @@ export const swaggerSpec = {
     '/api/tasks': {
       get: {
         summary: 'Get all tasks',
-        description: 'Retrieve all tasks for the authenticated user with pagination',
+        description: 'Retrieve all tasks for the authenticated user with search, filters, sorting, and pagination',
         parameters: [
           {
-            name: 'page',
+            name: 'q',
             in: 'query',
-            schema: { type: 'integer', default: 1 },
+            description: 'Search query for title/description (case-insensitive)',
+            schema: { type: 'string' },
+            example: 'meeting',
+          },
+          {
+            name: 'status',
+            in: 'query',
+            description: 'Filter by status',
+            schema: { type: 'string', enum: ['todo', 'in_progress', 'done', 'archived'] },
+          },
+          {
+            name: 'priority',
+            in: 'query',
+            description: 'Filter by priority (1-5)',
+            schema: { type: 'integer', minimum: 1, maximum: 5 },
+          },
+          {
+            name: 'sort',
+            in: 'query',
+            description: 'Sort order',
+            schema: {
+              type: 'string',
+              enum: ['created_desc', 'created_asc', 'deadline_asc', 'deadline_desc', 'priority_desc', 'priority_asc'],
+              default: 'created_desc',
+            },
           },
           {
             name: 'limit',
             in: 'query',
+            description: 'Number of results per page',
             schema: { type: 'integer', default: 20, maximum: 100 },
+          },
+          {
+            name: 'offset',
+            in: 'query',
+            description: 'Number of results to skip',
+            schema: { type: 'integer', default: 0, minimum: 0 },
           },
         ],
         responses: {
           200: {
-            description: 'List of tasks',
+            description: 'List of tasks with pagination and filters',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    tasks: {
-                      type: 'array',
-                      items: { $ref: '#/components/schemas/Task' },
-                    },
-                    pagination: {
+                    success: { type: 'boolean', example: true },
+                    data: {
                       type: 'object',
                       properties: {
-                        page: { type: 'integer' },
-                        limit: { type: 'integer' },
-                        total: { type: 'integer' },
-                        totalPages: { type: 'integer' },
+                        tasks: {
+                          type: 'array',
+                          items: { $ref: '#/components/schemas/Task' },
+                        },
+                        pagination: {
+                          type: 'object',
+                          properties: {
+                            limit: { type: 'integer' },
+                            offset: { type: 'integer' },
+                            total: { type: 'integer' },
+                            hasMore: { type: 'boolean' },
+                          },
+                        },
+                        filters: {
+                          type: 'object',
+                          properties: {
+                            q: { type: 'string', nullable: true },
+                            status: { type: 'string', nullable: true },
+                            priority: { type: 'integer', nullable: true },
+                            sort: { type: 'string' },
+                          },
+                        },
                       },
                     },
                   },
@@ -167,12 +213,12 @@ export const swaggerSpec = {
                 type: 'object',
                 required: ['title'],
                 properties: {
-                  title: { type: 'string' },
-                  description: { type: 'string' },
-                  status: { type: 'string', enum: ['todo', 'in_progress', 'done', 'archived'] },
-                  priority: { type: 'integer', minimum: 1, maximum: 5 },
-                  deadline: { type: 'string', format: 'date-time' },
-                  tags: { type: 'array', items: { type: 'string' } },
+                  title: { type: 'string', minLength: 1, maxLength: 255, example: 'Complete project documentation' },
+                  description: { type: 'string', example: 'Write comprehensive API docs and README' },
+                  status: { type: 'string', enum: ['todo', 'in_progress', 'done', 'archived'], default: 'todo' },
+                  priority: { type: 'integer', minimum: 1, maximum: 5, default: 2, example: 3 },
+                  deadline: { type: 'string', format: 'date-time', nullable: true, example: '2024-12-31T23:59:59Z' },
+                  tags: { type: 'array', items: { type: 'string' }, default: [], example: ['documentation', 'urgent'] },
                 },
               },
             },
@@ -180,15 +226,30 @@ export const swaggerSpec = {
         },
         responses: {
           201: {
-            description: 'Task created',
+            description: 'Task created successfully',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    task: { $ref: '#/components/schemas/Task' },
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        task: { $ref: '#/components/schemas/Task' },
+                      },
+                    },
+                    message: { type: 'string', example: 'Task created successfully' },
                   },
                 },
+              },
+            },
+          },
+          400: {
+            description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
               },
             },
           },
@@ -198,13 +259,14 @@ export const swaggerSpec = {
     '/api/tasks/{id}': {
       get: {
         summary: 'Get a task',
-        description: 'Retrieve a single task by ID',
+        description: 'Retrieve a single task by ID. Task must belong to the authenticated user.',
         parameters: [
           {
             name: 'id',
             in: 'path',
             required: true,
             schema: { type: 'string', format: 'uuid' },
+            description: 'Task ID',
           },
         ],
         responses: {
@@ -215,7 +277,74 @@ export const swaggerSpec = {
                 schema: {
                   type: 'object',
                   properties: {
-                    task: { $ref: '#/components/schemas/Task' },
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        task: { $ref: '#/components/schemas/Task' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          404: {
+            description: 'Task not found or does not belong to user',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        summary: 'Update a task',
+        description: 'Partially update an existing task. Only provided fields will be updated.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'Task ID',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string', minLength: 1, maxLength: 255 },
+                  description: { type: 'string', nullable: true },
+                  status: { type: 'string', enum: ['todo', 'in_progress', 'done', 'archived'] },
+                  priority: { type: 'integer', minimum: 1, maximum: 5 },
+                  deadline: { type: 'string', format: 'date-time', nullable: true },
+                  tags: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Task updated successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        task: { $ref: '#/components/schemas/Task' },
+                      },
+                    },
+                    message: { type: 'string', example: 'Task updated successfully' },
                   },
                 },
               },
@@ -231,73 +360,38 @@ export const swaggerSpec = {
           },
         },
       },
-      put: {
-        summary: 'Update a task',
-        description: 'Update an existing task',
-        parameters: [
-          {
-            name: 'id',
-            in: 'path',
-            required: true,
-            schema: { type: 'string', format: 'uuid' },
-          },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  description: { type: 'string' },
-                  status: { type: 'string' },
-                  priority: { type: 'integer' },
-                  deadline: { type: 'string', format: 'date-time' },
-                  tags: { type: 'array', items: { type: 'string' } },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: 'Task updated',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    task: { $ref: '#/components/schemas/Task' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
       delete: {
         summary: 'Delete a task',
-        description: 'Delete a task by ID',
+        description: 'Delete a task by ID. Task must belong to the authenticated user.',
         parameters: [
           {
             name: 'id',
             in: 'path',
             required: true,
             schema: { type: 'string', format: 'uuid' },
+            description: 'Task ID',
           },
         ],
         responses: {
           200: {
-            description: 'Task deleted',
+            description: 'Task deleted successfully',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    message: { type: 'string' },
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Task deleted successfully' },
                   },
                 },
+              },
+            },
+          },
+          404: {
+            description: 'Task not found or does not belong to user',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
               },
             },
           },
@@ -329,7 +423,7 @@ export const swaggerSpec = {
       },
       post: {
         summary: 'Create a note',
-        description: 'Create a new note',
+        description: 'Create a new note for the authenticated user',
         requestBody: {
           required: true,
           content: {
@@ -338,10 +432,10 @@ export const swaggerSpec = {
                 type: 'object',
                 required: ['title', 'content'],
                 properties: {
-                  title: { type: 'string' },
-                  content: { type: 'string' },
-                  tags: { type: 'array', items: { type: 'string' } },
-                  pinned: { type: 'boolean' },
+                  title: { type: 'string', minLength: 1, maxLength: 255, example: 'Project Ideas' },
+                  content: { type: 'string', minLength: 1, example: 'List of ideas for the new project...' },
+                  tags: { type: 'array', items: { type: 'string' }, default: [], example: ['work', 'ideas'] },
+                  pinned: { type: 'boolean', default: false },
                 },
               },
             },
@@ -349,32 +443,32 @@ export const swaggerSpec = {
         },
         responses: {
           201: {
-            description: 'Note created',
-          },
-        },
-      },
-    },
-    '/api/notes/search': {
-      post: {
-        summary: 'Search notes',
-        description: 'Full-text search across notes',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['query'],
-                properties: {
-                  query: { type: 'string' },
+            description: 'Note created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        note: { $ref: '#/components/schemas/Note' },
+                      },
+                    },
+                    message: { type: 'string', example: 'Note created successfully' },
+                  },
                 },
               },
             },
           },
-        },
-        responses: {
-          200: {
-            description: 'Search results',
+          400: {
+            description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
+              },
+            },
           },
         },
       },

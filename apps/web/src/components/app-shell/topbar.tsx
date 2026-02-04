@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -23,7 +22,6 @@ export function Topbar({ title, action }: TopbarProps) {
       <div className="flex items-center gap-2">
         {action && (
           <Button onClick={action.onClick} size="sm">
-            <Plus className="mr-2 h-4 w-4" />
             {action.label}
           </Button>
         )}

@@ -10,7 +10,6 @@ import {
   Settings,
   Menu,
   X,
-  Sparkles,
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -54,10 +53,7 @@ export function Sidebar() {
         )}
       >
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-primary">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
+          <div className="flex h-16 items-center border-b border-border px-6">
             <h1 className="text-xl font-bold">NoteAI</h1>
           </div>
 

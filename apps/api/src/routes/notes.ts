@@ -6,8 +6,7 @@ import {
   createNoteSchema,
   updateNoteSchema,
   noteIdSchema,
-  searchNotesSchema,
-  paginationSchema,
+  noteQuerySchema,
 } from '../lib/validators';
 
 const router = Router();
@@ -17,31 +16,85 @@ router.use(authenticateUser);
 
 /**
  * @route GET /api/notes
- * @desc Get all notes for the authenticated user
+ * @desc Get all notes for the authenticated user with search, filters, sorting, and pagination
  * @access Private
+ * @query q - Search query for title/content (case-insensitive)
+ * @query tag - Filter by tag (notes containing this tag)
+ * @query pinned - Filter by pinned status (true/false)
+ * @query sort - Sort order (updated_desc, updated_asc, created_desc, created_asc, title_asc, title_desc)
+ * @query limit - Number of results per page (default: 20, max: 100)
+ * @query offset - Number of results to skip (default: 0)
  */
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
-    const { page, limit } = paginationSchema.parse(req.query);
-    const offset = (page - 1) * limit;
+    const { q, tag, pinned, sort, limit, offset } = noteQuerySchema.parse(req.query);
 
-    const { data, error, count } = await supabaseAdmin
+    // Start building the query
+    let query = supabaseAdmin
       .from('notes')
       .select('*', { count: 'exact' })
-      .eq('user_id', req.userId!)
-      .order('pinned', { ascending: false })
-      .order('updated_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .eq('user_id', req.userId!);
+
+    // Apply search filter (ILIKE for case-insensitive search)
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,content.ilike.%${q}%`);
+    }
+
+    // Apply tag filter (check if tags array contains the tag)
+    if (tag) {
+      query = query.contains('tags', [tag]);
+    }
+
+    // Apply pinned filter
+    if (pinned !== undefined) {
+      query = query.eq('pinned', pinned);
+    }
+
+    // Apply sorting
+    switch (sort) {
+      case 'updated_desc':
+        query = query.order('updated_at', { ascending: false });
+        break;
+      case 'updated_asc':
+        query = query.order('updated_at', { ascending: true });
+        break;
+      case 'created_desc':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'created_asc':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'title_asc':
+        query = query.order('title', { ascending: true });
+        break;
+      case 'title_desc':
+        query = query.order('title', { ascending: false });
+        break;
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
 
     if (error) throw error;
 
     res.json({
-      notes: data,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit),
+      success: true,
+      data: {
+        notes: data || [],
+        pagination: {
+          limit,
+          offset,
+          total: count || 0,
+          hasMore: (count || 0) > offset + limit,
+        },
+        filters: {
+          q: q || null,
+          tag: tag || null,
+          pinned: pinned !== undefined ? pinned : null,
+          sort,
+        },
       },
     });
   } catch (error) {
@@ -63,16 +116,20 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
       .select('*')
       .eq('id', id)
       .eq('user_id', req.userId!)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        throw new AppError('Note not found', 'NOT_FOUND', 404);
-      }
-      throw error;
+    if (error) throw error;
+
+    if (!data) {
+      throw new AppError('Note not found', 'NOTE_NOT_FOUND', 404);
     }
 
-    res.json({ note: data });
+    res.json({
+      success: true,
+      data: {
+        note: data,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -98,22 +155,41 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
     if (error) throw error;
 
-    res.status(201).json({ note: data });
+    res.status(201).json({
+      success: true,
+      data: {
+        note: data,
+      },
+      message: 'Note created successfully',
+    });
   } catch (error) {
     next(error);
   }
 });
 
 /**
- * @route PUT /api/notes/:id
- * @desc Update a note
+ * @route PATCH /api/notes/:id
+ * @desc Update a note (partial update)
  * @access Private
  */
-router.put('/:id', async (req: AuthRequest, res, next) => {
+router.patch('/:id', async (req: AuthRequest, res, next) => {
   try {
     const { id } = noteIdSchema.parse(req.params);
     const updates = updateNoteSchema.parse(req.body);
 
+    // Check if note exists and belongs to user
+    const { data: existingNote } = await supabaseAdmin
+      .from('notes')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.userId!)
+      .maybeSingle();
+
+    if (!existingNote) {
+      throw new AppError('Note not found', 'NOTE_NOT_FOUND', 404);
+    }
+
+    // Update the note
     const { data, error } = await supabaseAdmin
       .from('notes')
       .update(updates)
@@ -122,14 +198,15 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        throw new AppError('Note not found', 'NOT_FOUND', 404);
-      }
-      throw error;
-    }
+    if (error) throw error;
 
-    res.json({ note: data });
+    res.json({
+      success: true,
+      data: {
+        note: data,
+      },
+      message: 'Note updated successfully',
+    });
   } catch (error) {
     next(error);
   }
@@ -144,6 +221,18 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     const { id } = noteIdSchema.parse(req.params);
 
+    // Check if note exists and belongs to user before deleting
+    const { data: existingNote } = await supabaseAdmin
+      .from('notes')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.userId!)
+      .maybeSingle();
+
+    if (!existingNote) {
+      throw new AppError('Note not found', 'NOTE_NOT_FOUND', 404);
+    }
+
     const { error } = await supabaseAdmin
       .from('notes')
       .delete()
@@ -152,29 +241,10 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
 
     if (error) throw error;
 
-    res.json({ message: 'Note deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * @route POST /api/notes/search
- * @desc Search notes using full-text search
- * @access Private
- */
-router.post('/search', async (req: AuthRequest, res, next) => {
-  try {
-    const { query } = searchNotesSchema.parse(req.body);
-
-    const { data, error } = await supabaseAdmin.rpc('search_notes', {
-      search_query: query,
-      user_uuid: req.userId!,
+    res.json({
+      success: true,
+      message: 'Note deleted successfully',
     });
-
-    if (error) throw error;
-
-    res.json({ notes: data });
   } catch (error) {
     next(error);
   }

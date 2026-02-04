@@ -48,6 +48,29 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ addUtilities }: any) {
+      addUtilities({
+        '.custom-scrollbar': {
+          'scrollbar-width': 'thin',
+          'scrollbar-color': 'rgb(var(--border)) transparent',
+        },
+        '.custom-scrollbar::-webkit-scrollbar': {
+          width: '6px',
+          height: '6px',
+        },
+        '.custom-scrollbar::-webkit-scrollbar-track': {
+          background: 'transparent',
+        },
+        '.custom-scrollbar::-webkit-scrollbar-thumb': {
+          'background-color': 'rgb(var(--border))',
+          'border-radius': '3px',
+        },
+        '.custom-scrollbar::-webkit-scrollbar-thumb:hover': {
+          'background-color': 'rgb(var(--muted))',
+        },
+      });
+    },
+  ],
 };
 export default config;
