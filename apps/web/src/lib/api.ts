@@ -133,7 +133,7 @@ export const notesApi = {
   },
 };
 
-// Tasks API (placeholder for future implementation)
+// Tasks API
 export interface Task {
   id: string;
   user_id: string;
@@ -147,6 +147,89 @@ export interface Task {
   updated_at: string;
 }
 
+export interface TasksResponse {
+  success: boolean;
+  data: {
+    tasks: Task[];
+    pagination: {
+      limit: number;
+      offset: number;
+      total: number;
+      hasMore: boolean;
+    };
+    filters: {
+      q: string | null;
+      status: string | null;
+      priority: number | null;
+      sort: string;
+    };
+  };
+}
+
+export interface TaskResponse {
+  success: boolean;
+  data: {
+    task: Task;
+  };
+  message?: string;
+}
+
 export const tasksApi = {
-  // TODO: Implement tasks API methods
+  getAll: async (params?: {
+    q?: string;
+    status?: string;
+    priority?: number;
+    sort?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<TasksResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.append('q', params.q);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.priority) searchParams.append('priority', String(params.priority));
+    if (params?.sort) searchParams.append('sort', params.sort);
+    if (params?.limit) searchParams.append('limit', String(params.limit));
+    if (params?.offset) searchParams.append('offset', String(params.offset));
+
+    const query = searchParams.toString();
+    return fetchWithAuth(`/api/tasks${query ? `?${query}` : ''}`);
+  },
+
+  getById: async (id: string): Promise<TaskResponse> => {
+    return fetchWithAuth(`/api/tasks/${id}`);
+  },
+
+  create: async (data: {
+    title: string;
+    description?: string;
+    status?: 'todo' | 'in_progress' | 'done' | 'archived';
+    priority?: number;
+    deadline?: string | null;
+    tags?: string[];
+  }): Promise<TaskResponse> => {
+    return fetchWithAuth('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: {
+    title?: string;
+    description?: string;
+    status?: 'todo' | 'in_progress' | 'done' | 'archived';
+    priority?: number;
+    deadline?: string | null;
+    tags?: string[];
+  }): Promise<TaskResponse> => {
+    return fetchWithAuth(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string): Promise<{ success: boolean; message: string }> => {
+    return fetchWithAuth(`/api/tasks/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };

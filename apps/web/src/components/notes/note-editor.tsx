@@ -18,6 +18,15 @@ import {
 } from '@/components/ui/dialog';
 import { Pin, Trash2, Check, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { z } from 'zod';
+import { toast } from 'sonner';
+
+const noteFormSchema = z.object({
+  title: z.string().min(1, 'Note title is required').max(255, 'Title must be less than 255 characters'),
+  content: z.string(),
+  tags: z.array(z.string()),
+  pinned: z.boolean(),
+});
 
 interface NoteEditorProps {
   note: Note | null;
@@ -64,7 +73,18 @@ export function NoteEditor({ note, onSave, onDelete, isLoading, isSaving }: Note
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
 
-    await onSave({ title, content, tags, pinned });
+    const formData = { title, content, tags, pinned };
+
+    // Validate form data
+    const validation = noteFormSchema.safeParse(formData);
+    if (!validation.success) {
+      validation.error.issues.forEach((issue) => {
+        toast.error(issue.message);
+      });
+      return;
+    }
+
+    await onSave(formData);
     setHasChanges(false);
   };
 

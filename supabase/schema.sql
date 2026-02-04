@@ -1,13 +1,3 @@
--- =====================================================
--- Attimo Database Schema
--- =====================================================
--- This schema defines the core tables for the Attimo app:
--- - profiles: User profile data
--- - tasks: User tasks with priority and status
--- - notes: User notes with AI enhancement support
--- - note_ai_runs: AI processing history for notes
--- =====================================================
-
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
