@@ -10,8 +10,10 @@ export const swaggerSpec = {
   },
   servers: [
     {
-      url: 'http://localhost:4000',
-      description: 'Development server',
+      url: process.env.NODE_ENV === 'production' 
+        ? 'https://attimo-note-ai-production.up.railway.app'
+        : 'http://localhost:4000',
+      description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
     },
   ],
   components: {

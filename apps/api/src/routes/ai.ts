@@ -92,7 +92,7 @@ router.get('/notes/:id/runs', async (req: AuthRequest, res, next) => {
     const { id } = noteIdSchema.parse(req.params);
 
     // Verify note belongs to user
-    const { data: note, error: noteError } = await supabaseAdmin
+    const { error: noteError } = await supabaseAdmin
       .from('notes')
       .select('id')
       .eq('id', id)

@@ -14,7 +14,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
-  handler: (req, res) => {
+  handler: (_req, res) => {
     res.status(429).json({
       error: 'Too many requests from this IP address. Please try again later.',
       code: 'RATE_LIMIT_EXCEEDED',
@@ -36,7 +36,7 @@ export const authLimiter = rateLimit({
     code: 'AUTH_RATE_LIMIT_EXCEEDED',
     retryAfter: '15 minutes',
   },
-  handler: (req, res) => {
+  handler: (_req, res) => {
     res.status(429).json({
       error: 'Too many authentication attempts from this IP. Please try again in 15 minutes.',
       code: 'AUTH_RATE_LIMIT_EXCEEDED',
@@ -57,7 +57,7 @@ export const aiLimiter = rateLimit({
     code: 'AI_RATE_LIMIT_EXCEEDED',
     retryAfter: '15 minutes',
   },
-  handler: (req, res) => {
+  handler: (_req, res) => {
     res.status(429).json({
       error: 'Too many AI requests from this IP. AI operations are resource-intensive. Please try again in 15 minutes.',
       code: 'AI_RATE_LIMIT_EXCEEDED',
@@ -78,7 +78,7 @@ export const createLimiter = rateLimit({
     code: 'CREATE_RATE_LIMIT_EXCEEDED',
     retryAfter: '15 minutes',
   },
-  handler: (req, res) => {
+  handler: (_req, res) => {
     res.status(429).json({
       error: 'Too many create requests from this IP. Please slow down.',
       code: 'CREATE_RATE_LIMIT_EXCEEDED',

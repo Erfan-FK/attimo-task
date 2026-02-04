@@ -273,12 +273,12 @@ router.post('/:id/ai', async (req: AuthRequest, res, next) => {
       .single();
 
     if (fetchError || !note) {
-      throw new AppError('Note not found', 404);
+      throw new AppError('Note not found', 'NOT_FOUND', 404);
     }
 
     // Check if note has content
     if (!note.content || note.content.trim().length === 0) {
-      throw new AppError('Note content is empty. Please add content before using AI features.', 400);
+      throw new AppError('Note content is empty. Please add content before using AI features.', 'VALIDATION_ERROR', 400);
     }
 
     // Generate AI response
@@ -291,7 +291,7 @@ router.post('/:id/ai', async (req: AuthRequest, res, next) => {
         actionItems = parseActionItems(output);
       } catch (parseError: any) {
         // Return user-friendly error for task extraction failures
-        throw new AppError(parseError.message || 'Failed to extract tasks from note', 400);
+        throw new AppError(parseError.message || 'Failed to extract tasks from note', 'AI_ERROR', 400);
       }
     }
 
@@ -340,7 +340,7 @@ router.get('/:id/ai-history', async (req: AuthRequest, res, next) => {
       .single();
 
     if (fetchError || !note) {
-      throw new AppError('Note not found', 404);
+      throw new AppError('Note not found', 'NOT_FOUND', 404);
     }
 
     // Fetch last 5 AI runs

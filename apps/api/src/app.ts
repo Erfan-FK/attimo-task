@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { errorHandler, notFoundHandler } from './middleware/error';
-import { apiLimiter, aiLimiter, createLimiter } from './middleware/rate-limit';
+import { apiLimiter, aiLimiter } from './middleware/rate-limit';
 import tasksRouter from './routes/tasks';
 import notesRouter from './routes/notes';
 import aiRouter from './routes/ai';
