@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { AuthRequest, authenticateUser } from '../middleware/auth';
 import { AppError } from '../middleware/error';
+import { aiLimiter } from '../middleware/rate-limit';
 import {
   createNoteSchema,
   updateNoteSchema,
@@ -257,7 +258,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
  * @desc Generate AI content for a note
  * @access Private
  */
-router.post('/:id/ai', async (req: AuthRequest, res, next) => {
+router.post('/:id/ai', aiLimiter, async (req: AuthRequest, res, next) => {
   try {
     const { id } = noteIdSchema.parse(req.params);
     const { action } = z.object({
